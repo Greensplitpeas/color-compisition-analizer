@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Simple & Complex Color Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #111;
+        color: #eee;
+        padding: 20px;
+      }
+      h1 {
+        text-align: center;
+      }
+      .wrapper {
+        max-width: 1100px;
+        margin: auto;
+      }
+      img {
+        max-width: 420px;
+        display: block;
+        margin: 20px auto;
+        border-radius: 10px;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        margin: 4px 0;
+      }
+      .label {
+        width: 260px;
+        font-size: 13px;
+      }
+      .bar-bg {
+        flex: 1;
+        background: #333;
+        height: 16px;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-right: 10px;
+      }
+      .bar-fill {
+        height: 100%;
+      }
+      .percent {
+        width: 70px;
+        font-size: 12px;
+        text-align: right;
+      }
+      .cluster {
+        margin-left: 36px;
+        opacity: 0.9;
+      }
+      .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        margin-right: 6px;
+        border: 1px solid #000;
+      }
+      .toggle {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      input[type="file"] {
+        display: block;
+        margin: 20px auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Color Analyzer</h1>
+
+    <div class="wrapper">
+      <input type="file" accept="image/*" id="upload" />
+      <div class="toggle">
+        <label>
+          <input type="checkbox" id="complexMode" />
+          specific mode
+        </label>
+      </div>
+      <img id="preview" hidden />
+      <div id="bars"></div>
+    </div>
+
+    <script>
+      const upload = document.getElementById("upload");
+      const preview = document.getElementById("preview");
+      const barsDiv = document.getElementById("bars");
+      const complexToggle = document.getElementById("complexMode");
+
+      const MAX_COLORS_PER_GROUP = 20;
+
+      const categories = {
+        Red: { hue: [345, 360, 0, 15], color: "#ff4d4d" },
+        Orange: { hue: [15, 45], color: "#ff9933" },
+        Yellow: { hue: [45, 65], color: "#ffee33" },
+        Green: { hue: [65, 170], color: "#33cc33" },
+        Blue: { hue: [170, 255], color: "#3399ff" },
+        Purple: { hue: [255, 345], color: "#aa66ff" },
+        White: { special: "white", color: "#ffffff" },
+        Black: { special: "black", color: "#000000" },
+      };
+
+      upload.addEventListener("change", handleImage);
+      complexToggle.addEventListener(
+        "change",
+        () => preview.src && analyze(preview)
+      );
+
+      function handleImage(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const img = new Image();
+        img.onload = () => {
+          preview.src = img.src;
+          preview.hidden = false;
+          analyze(img);
+        };
+        img.src = URL.createObjectURL(file);
+      }
+
+      function analyze(img) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const data = ctx.getImageData(0, 0, img.width, img.height).data;
+
+        const groups = {};
+        for (const c in categories) {
+          groups[c] = { total: 0, colors: {} };
+        }
+
+        let valid = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i],
+            g = data[i + 1],
+            b = data[i + 2];
+          const hex = rgbToHex(r, g, b);
+          const { h, s, v } = rgbToHsv(r, g, b);
+
+          let group = null;
+
+          if (v < 0.12) group = "Black";
+          else if (v > 0.9 && s < 0.12) group = "White";
+          else if (s < 0.15) continue;
+          else {
+            for (const c in categories) {
+              if (!categories[c].hue) continue;
+              if (inHue(h, categories[c].hue)) {
+                group = c;
+                break;
+              }
+            }
+          }
+
+          if (!group) continue;
+
+          valid++;
+          groups[group].total++;
+          if (complexToggle.checked) {
+            groups[group].colors[hex] = (groups[group].colors[hex] || 0) + 1;
+          }
+        }
+
+        render(groups, valid);
+      }
+
+      function render(groups, total) {
+        barsDiv.innerHTML = "";
+        for (const g in groups) {
+          if (groups[g].total === 0) continue;
+
+          // SIMPLE MODE
+          if (!complexToggle.checked) {
+            addBar(
+              g,
+              (groups[g].total / total) * 100,
+              categories[g].color,
+              false
+            );
+            continue;
+          }
+
+          // COMPLEX MODE
+          addBar(g, (groups[g].total / total) * 100, "#666", false);
+
+          const entries = Object.entries(groups[g].colors)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, MAX_COLORS_PER_GROUP);
+
+          entries.forEach(([hex, count]) => {
+            addBar(hex, (count / total) * 100, hex, true);
+          });
+        }
+      }
+
+      function addBar(label, percent, color, cluster) {
+        barsDiv.innerHTML += `
+    <div class="bar ${cluster ? "cluster" : ""}">
+      <div class="swatch" style="background:${color}"></div>
+      <div class="label">${label}</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width:${percent.toFixed(
+          2
+        )}%; background:${color}"></div>
+      </div>
+      <div class="percent">${percent.toFixed(2)}%</div>
+    </div>
+  `;
+      }
+
+      function inHue(h, r) {
+        return r.length === 4 ? h >= r[0] || h < r[3] : h >= r[0] && h < r[1];
+      }
+
+      function rgbToHex(r, g, b) {
+        return (
+          "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")
+        );
+      }
+
+      function rgbToHsv(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        const max = Math.max(r, g, b),
+          min = Math.min(r, g, b);
+        const d = max - min;
+        let h = 0;
+        if (d) {
+          if (max === r) h = ((g - b) / d) % 6;
+          else if (max === g) h = (b - r) / d + 2;
+          else h = (r - g) / d + 4;
+          h *= 60;
+          if (h < 0) h += 360;
+        }
+        return { h, s: max ? d / max : 0, v: max };
+      }
+    </script>
+  </body>
+</html>
