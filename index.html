@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Simple & Complex Color Analyzer</title>
+    <title>Simple Color Analyzer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       body {
@@ -68,24 +68,53 @@
         display: block;
         margin: 20px auto;
       }
+      footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #333;
+        text-align: center;
+        font-size: 13px;
+        color: #aaa;
+      }
+      footer a {
+        color: #6cf;
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
-    <h1>Color Analyzer</h1>
+    <h1>
+      Color Analyzer <span style="font-size: 14px; color: #aaa">v1.0.0</span>
+    </h1>
 
     <div class="wrapper">
       <input type="file" accept="image/*" id="upload" />
       <div class="toggle">
         <label>
           <input type="checkbox" id="complexMode" />
-          specific mode
+          Complex mode (exact color clusters)
         </label>
       </div>
       <img id="preview" hidden />
       <div id="bars"></div>
     </div>
 
+    <footer>
+      <p>
+        Color Analyzer v1.0.0<br />
+        Built by <strong>Ari Maggs</strong><br />
+        HTML5 Canvas & JavaScript
+      </p>
+      <p>
+        All image processing is performed locally in your browser.<br />
+        No images are uploaded or stored.
+      </p>
+      <p>© <span id="year"></span></p>
+    </footer>
+
     <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+
       const upload = document.getElementById("upload");
       const preview = document.getElementById("preview");
       const barsDiv = document.getElementById("bars");
@@ -177,7 +206,6 @@
         for (const g in groups) {
           if (groups[g].total === 0) continue;
 
-          // SIMPLE MODE
           if (!complexToggle.checked) {
             addBar(
               g,
@@ -188,7 +216,6 @@
             continue;
           }
 
-          // COMPLEX MODE
           addBar(g, (groups[g].total / total) * 100, "#666", false);
 
           const entries = Object.entries(groups[g].colors)
@@ -246,3 +273,4 @@
     </script>
   </body>
 </html>
+
