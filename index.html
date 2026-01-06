@@ -2,12 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Simple Color Analyzer</title>
+    <title>Color Analyzer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       body {
         font-family: Arial, sans-serif;
-        background: #111;
+        background: #000000;
         color: #eee;
         padding: 20px;
       }
@@ -84,7 +84,7 @@
   </head>
   <body>
     <h1>
-      Color Analyzer <span style="font-size: 14px; color: #aaa">v1.0.0</span>
+      Color Analyzer <span style="font-size: 14px; color: #ffffff">v1.0.0</span>
     </h1>
 
     <div class="wrapper">
@@ -92,7 +92,7 @@
       <div class="toggle">
         <label>
           <input type="checkbox" id="complexMode" />
-          Complex mode (exact color clusters)
+          Complex mode
         </label>
       </div>
       <img id="preview" hidden />
@@ -103,7 +103,6 @@
       <p>
         Color Analyzer v1.0.0<br />
         Built by <strong>Ari Maggs</strong><br />
-        HTML5 Canvas & JavaScript
       </p>
       <p>
         All image processing is performed locally in your browser.<br />
@@ -273,4 +272,3 @@
     </script>
   </body>
 </html>
-
