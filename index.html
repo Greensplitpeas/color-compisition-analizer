@@ -11,24 +11,34 @@
         color: #eee;
         padding: 20px;
       }
+
       h1 {
         text-align: center;
       }
+
       .wrapper {
         max-width: 1100px;
         margin: auto;
+        position: relative;
       }
+
       img {
         max-width: 420px;
         display: block;
         margin: 20px auto;
         border-radius: 10px;
       }
+
+      #preview:hover {
+        cursor: none;
+      }
+
       .bar {
         display: flex;
         align-items: center;
         margin: 4px 0;
       }
+
       .label {
         width: 260px;
         font-size: 13px;
@@ -68,6 +78,7 @@
         display: block;
         margin: 20px auto;
       }
+
       footer {
         margin-top: 40px;
         padding-top: 20px;
@@ -76,33 +87,85 @@
         font-size: 13px;
         color: #aaa;
       }
-      footer a {
-        color: #6cf;
-        text-decoration: none;
+
+      #cursorCircle {
+        position: fixed;
+        width: 14px;
+        height: 14px;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        display: none;
+        z-index: 1000;
+      }
+
+      #hoverColor {
+        text-align: center;
+        font-size: 14px;
+        color: #ffffff;
+      }
+
+      .controls {
+        text-align: center;
+        margin-top: 10px;
+        margin-bottom: 10px;
+      }
+
+      .controls button {
+        background: #333;
+        color: #fff;
+        border: none;
+        padding: 6px 12px;
+        margin: 0 5px;
+        font-size: 14px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      .controls button:hover {
+        background: #555;
+      }
+
+      #radiusDisplay {
+        display: inline-block;
+        margin-left: 10px;
+        font-size: 14px;
       }
     </style>
   </head>
+
   <body>
     <h1>
-      Color Analyzer <span style="font-size: 14px; color: #ffffff">v1.0.0</span>
+      Color Analyzer <span style="font-size: 14px; color: #ffffff">v1.2.1</span>
     </h1>
 
     <div class="wrapper">
       <input type="file" accept="image/*" id="upload" />
+
       <div class="toggle">
-        <label>
-          <input type="checkbox" id="complexMode" />
-          Complex mode
-        </label>
+        <label> <input type="checkbox" id="complexMode" /> Complex mode </label>
       </div>
+
       <img id="preview" hidden />
+      <div id="cursorCircle"></div>
+      <div id="hoverColor">
+        Hover over the image to sample color • Press C to copy
+      </div>
+
+      <div class="controls">
+        <button id="decrease">-</button>
+        <button id="increase">+</button>
+        <span id="radiusDisplay">Radius: 4</span>
+      </div>
+
       <div id="bars"></div>
     </div>
 
     <footer>
       <p>
-        Color Analyzer v1.0.0<br />
-        Built by <strong>Ari Maggs</strong><br />
+        Color Analyzer v1.2.1<br />
+        Built by <strong>Ari Maggs</strong>
       </p>
       <p>
         All image processing is performed locally in your browser.<br />
@@ -118,9 +181,13 @@
       const preview = document.getElementById("preview");
       const barsDiv = document.getElementById("bars");
       const complexToggle = document.getElementById("complexMode");
+      const hoverText = document.getElementById("hoverColor");
+      const cursorCircle = document.getElementById("cursorCircle");
+      const increaseBtn = document.getElementById("increase");
+      const decreaseBtn = document.getElementById("decrease");
+      const radiusDisplay = document.getElementById("radiusDisplay");
 
       const MAX_COLORS_PER_GROUP = 20;
-
       const categories = {
         Red: { hue: [345, 360, 0, 15], color: "#ff4d4d" },
         Orange: { hue: [15, 45], color: "#ff9933" },
@@ -131,6 +198,11 @@
         White: { special: "white", color: "#ffffff" },
         Black: { special: "black", color: "#000000" },
       };
+
+      let hoverCanvas, hoverCtx;
+      let lastHoverHex = null;
+      let hoveringImage = false;
+      let sampleRadius = 4;
 
       upload.addEventListener("change", handleImage);
       complexToggle.addEventListener(
@@ -145,10 +217,95 @@
         img.onload = () => {
           preview.src = img.src;
           preview.hidden = false;
+          setupHoverCanvas();
           analyze(img);
         };
         img.src = URL.createObjectURL(file);
       }
+
+      function setupHoverCanvas() {
+        hoverCanvas = document.createElement("canvas");
+        hoverCanvas.width = preview.naturalWidth;
+        hoverCanvas.height = preview.naturalHeight;
+        hoverCtx = hoverCanvas.getContext("2d");
+        hoverCtx.drawImage(preview, 0, 0);
+      }
+
+      preview.addEventListener("mousemove", (e) => {
+        if (!hoverCtx) return;
+        const rect = preview.getBoundingClientRect();
+        const scaleX = preview.naturalWidth / rect.width;
+        const scaleY = preview.naturalHeight / rect.height;
+        const x = Math.floor((e.clientX - rect.left) * scaleX);
+        const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+        let r = 0,
+          g = 0,
+          b = 0,
+          count = 0;
+        for (let dy = -sampleRadius; dy <= sampleRadius; dy++) {
+          for (let dx = -sampleRadius; dx <= sampleRadius; dx++) {
+            const px = x + dx,
+              py = y + dy;
+            if (
+              px < 0 ||
+              py < 0 ||
+              px >= hoverCanvas.width ||
+              py >= hoverCanvas.height
+            )
+              continue;
+            const d = hoverCtx.getImageData(px, py, 1, 1).data;
+            r += d[0];
+            g += d[1];
+            b += d[2];
+            count++;
+          }
+        }
+        r = Math.round(r / count);
+        g = Math.round(g / count);
+        b = Math.round(b / count);
+        const hex = rgbToHex(r, g, b);
+        lastHoverHex = hex;
+        hoveringImage = true;
+
+        hoverText.textContent = `Average color: ${hex} • Press C to copy`;
+        hoverText.style.color = "#ffffff";
+
+        cursorCircle.style.display = "block";
+        cursorCircle.style.left = `${e.clientX}px`;
+        cursorCircle.style.top = `${e.clientY}px`;
+        cursorCircle.style.width = `${sampleRadius * 2}px`;
+        cursorCircle.style.height = `${sampleRadius * 2}px`;
+        cursorCircle.style.borderColor = hex;
+      });
+
+      preview.addEventListener("mouseleave", () => {
+        hoveringImage = false;
+        lastHoverHex = null;
+        cursorCircle.style.display = "none";
+        hoverText.textContent =
+          "Hover over the image to sample color • Press C to copy";
+        hoverText.style.color = "#ffffff";
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key.toLowerCase() === "c" && hoveringImage && lastHoverHex) {
+          // Copy the FULL hex code (#RRGGBB)
+          navigator.clipboard.writeText(lastHoverHex).then(() => {
+            hoverText.textContent = `Copied ${lastHoverHex}`;
+            hoverText.style.color = "#ffffff";
+          });
+        }
+      });
+
+      increaseBtn.addEventListener("click", () => {
+        sampleRadius = Math.min(sampleRadius + 1, 40);
+        radiusDisplay.textContent = `Radius: ${sampleRadius}`;
+      });
+      decreaseBtn.addEventListener("click", () => {
+        sampleRadius = Math.max(sampleRadius - 1, 1);
+        radiusDisplay.textContent = `Radius: ${sampleRadius}`;
+      });
 
       function analyze(img) {
         const canvas = document.createElement("canvas");
@@ -156,25 +313,17 @@
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
-
         const data = ctx.getImageData(0, 0, img.width, img.height).data;
-
         const groups = {};
-        for (const c in categories) {
-          groups[c] = { total: 0, colors: {} };
-        }
-
+        for (const c in categories) groups[c] = { total: 0, colors: {} };
         let valid = 0;
-
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i],
             g = data[i + 1],
             b = data[i + 2];
           const hex = rgbToHex(r, g, b);
           const { h, s, v } = rgbToHsv(r, g, b);
-
           let group = null;
-
           if (v < 0.12) group = "Black";
           else if (v > 0.9 && s < 0.12) group = "White";
           else if (s < 0.15) continue;
@@ -187,43 +336,32 @@
               }
             }
           }
-
           if (!group) continue;
-
           valid++;
           groups[group].total++;
-          if (complexToggle.checked) {
+          if (complexToggle.checked)
             groups[group].colors[hex] = (groups[group].colors[hex] || 0) + 1;
-          }
         }
-
         render(groups, valid);
       }
 
       function render(groups, total) {
         barsDiv.innerHTML = "";
         for (const g in groups) {
-          if (groups[g].total === 0) continue;
-
-          if (!complexToggle.checked) {
-            addBar(
-              g,
-              (groups[g].total / total) * 100,
-              categories[g].color,
-              false
-            );
-            continue;
-          }
-
-          addBar(g, (groups[g].total / total) * 100, "#666", false);
-
-          const entries = Object.entries(groups[g].colors)
+          if (!groups[g].total) continue;
+          addBar(
+            g,
+            (groups[g].total / total) * 100,
+            complexToggle.checked ? "#666" : categories[g].color,
+            false
+          );
+          if (!complexToggle.checked) continue;
+          Object.entries(groups[g].colors)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, MAX_COLORS_PER_GROUP);
-
-          entries.forEach(([hex, count]) => {
-            addBar(hex, (count / total) * 100, hex, true);
-          });
+            .slice(0, MAX_COLORS_PER_GROUP)
+            .forEach(([hex, count]) => {
+              addBar(hex, (count / total) * 100, hex, true);
+            });
         }
       }
 
@@ -238,20 +376,17 @@
         )}%; background:${color}"></div>
       </div>
       <div class="percent">${percent.toFixed(2)}%</div>
-    </div>
-  `;
+    </div>`;
       }
 
       function inHue(h, r) {
         return r.length === 4 ? h >= r[0] || h < r[3] : h >= r[0] && h < r[1];
       }
-
       function rgbToHex(r, g, b) {
         return (
-          "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")
+          "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")
         );
       }
-
       function rgbToHsv(r, g, b) {
         r /= 255;
         g /= 255;
